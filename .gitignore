@@ -1,0 +1,14 @@
+node_modules
+.env
+.env.local
+
+# Next.js
+.next/
+out/
+
+# Prisma
+/generated/
+
+# Misc
+.DS_Store
+*.tsbuildinfo
