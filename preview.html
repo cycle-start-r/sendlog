@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<title>Sendlog</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; }
+  * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+  input, select, textarea { font-family: inherit; font-size: 16px !important; }
+</style>
+<script>
+  tailwind.config = {
+    theme: { extend: { colors: { brand: { 50:'#f0fdf4',100:'#dcfce7',200:'#bbf7d0',300:'#86efac',400:'#4ade80',500:'#22c55e',600:'#16a34a',700:'#15803d',800:'#166534',900:'#14532d' } } } }
+  }
+</script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useMemo, useCallback } = React;
+
+// ── Grade maps ────────────────────────────────────────────────────────────────
+const V_GRADES = ["VB","V0","V1","V2","V3","V4","V5","V6","V7","V8","V9","V10","V11","V12"];
+const V_NORM   = {VB:3,V0:8,V1:14,V2:20,V3:26,V4:32,V5:38,V6:44,V7:52,V8:60,V9:68,V10:76,V11:83,V12:90};
+const YDS_GRADES = ["5.9","5.10a","5.10b","5.10c","5.10d","5.11a","5.11b","5.11c","5.11d","5.12a","5.12b","5.12c","5.12d","5.13a","5.13b","5.13c","5.13d"];
+const YDS_NORM   = {"5.9":10,"5.10a":18,"5.10b":22,"5.10c":26,"5.10d":30,"5.11a":36,"5.11b":40,"5.11c":44,"5.11d":48,"5.12a":54,"5.12b":58,"5.12c":62,"5.12d":66,"5.13a":72,"5.13b":76,"5.13c":80,"5.13d":84};
+const FONT_GRADES = ["6A","6A+","6B","6B+","6C","6C+","7A","7A+","7B","7B+","7C","7C+","8A","8A+"];
+const FONT_NORM   = {"6A":18,"6A+":22,"6B":26,"6B+":30,"6C":34,"6C+":38,"7A":44,"7A+":50,"7B":56,"7B+":62,"7C":68,"7C+":74,"8A":82,"8A+":88};
+
+const GRADE_SYSTEMS = {
+  V_SCALE: { grades: V_GRADES, norm: V_NORM, label: "V-Scale" },
+  YDS:     { grades: YDS_GRADES, norm: YDS_NORM, label: "YDS" },
+  FONT:    { grades: FONT_GRADES, norm: FONT_NORM, label: "Font" },
+};
+
+function normGrade(g, sys) { return (GRADE_SYSTEMS[sys]?.norm[g]) ?? 0; }
+function gradeOpts(sys) { return GRADE_SYSTEMS[sys]?.grades ?? V_GRADES; }
+
+// ── Seed data ─────────────────────────────────────────────────────────────────
+const SEED = [
+  { id:"s1", date:"2026-03-12", location:"Movement Oakland", type:"GYM", discipline:"Bouldering", duration:90, energy:4, notes:"Felt strong. Worked the V7 overhang.",
+    climbs:[
+      {id:"c1",grade:"V4",gradeNorm:32,outcome:"FLASH",  attempts:1,isProject:false},
+      {id:"c2",grade:"V5",gradeNorm:38,outcome:"SEND",   attempts:2,isProject:false},
+      {id:"c3",grade:"V5",gradeNorm:38,outcome:"SEND",   attempts:1,isProject:false},
+      {id:"c4",grade:"V6",gradeNorm:44,outcome:"SEND",   attempts:3,isProject:false},
+      {id:"c5",grade:"V7",gradeNorm:52,outcome:"ATTEMPT",attempts:6,isProject:true, notes:"Got to the crux."},
+    ]},
+  { id:"s2", date:"2026-03-17", location:"Movement Oakland", type:"GYM", discipline:"Bouldering", duration:75, energy:3, notes:"Tired from work. Good burns on the project.",
+    climbs:[
+      {id:"c6",grade:"V3",gradeNorm:26,outcome:"FLASH",  attempts:1,isProject:false},
+      {id:"c7",grade:"V5",gradeNorm:38,outcome:"SEND",   attempts:2,isProject:false},
+      {id:"c8",grade:"V6",gradeNorm:44,outcome:"ATTEMPT",attempts:3,isProject:false},
+      {id:"c9",grade:"V7",gradeNorm:52,outcome:"ATTEMPT",attempts:5,isProject:true, notes:"Dynamic move still hard."},
+    ]},
+  { id:"s3", date:"2026-03-21", location:"Movement Oakland", type:"GYM", discipline:"Bouldering", duration:120, energy:5, notes:"SENT THE V7!! Everything clicked today.",
+    climbs:[
+      {id:"c10",grade:"V4",gradeNorm:32,outcome:"FLASH",attempts:1,isProject:false},
+      {id:"c11",grade:"V5",gradeNorm:38,outcome:"SEND", attempts:1,isProject:false},
+      {id:"c12",grade:"V6",gradeNorm:44,outcome:"SEND", attempts:2,isProject:false},
+      {id:"c13",grade:"V7",gradeNorm:52,outcome:"SEND", attempts:3,isProject:false,notes:"Project sent!"},
+      {id:"c14",grade:"V8",gradeNorm:60,outcome:"ATTEMPT",attempts:4,isProject:true,notes:"New project. Powerful."},
+    ]},
+];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function uid() { return Math.random().toString(36).slice(2,9); }
+function fmtDate(d) {
+  return new Date(d + "T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+}
+const OUTCOME_COLOR = {
+  SEND:    "bg-green-100 text-green-700",
+  FLASH:   "bg-blue-100  text-blue-700",
+  ONSIGHT: "bg-purple-100 text-purple-700",
+  ATTEMPT: "bg-slate-100  text-slate-500",
+  PROJECT: "bg-amber-100  text-amber-700",
+};
+const ENERGY = ["","😴","😐","🙂","💪","🔥"];
+const isSend = o => ["SEND","FLASH","ONSIGHT"].includes(o);
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+function Pill({ children, cls="" }) {
+  return <span className={`text-xs rounded-full px-2.5 py-0.5 font-medium ${cls}`}>{children}</span>;
+}
+function Tag({ children }) {
+  return <span className="text-xs bg-slate-100 text-slate-500 rounded-lg px-2.5 py-1">{children}</span>;
+}
+function Stat({ label, value, sub, color="text-slate-900" }) {
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl py-3 px-2 text-center">
+      <p className={`text-2xl font-black ${color}`}>{value}</p>
+      {sub && <p className="text-xs text-green-600 font-medium">{sub}</p>}
+      <p className="text-xs text-slate-400 mt-0.5 leading-tight">{label}</p>
+    </div>
+  );
+}
+
+// ── Grade Pyramid ─────────────────────────────────────────────────────────────
+function GradePyramid({ sessions }) {
+  const buckets = {};
+  sessions.flatMap(s=>s.climbs.filter(c=>isSend(c.outcome))).forEach(c=>{
+    buckets[c.grade] = (buckets[c.grade]||0) + 1;
+  });
+  const entries = Object.entries(buckets).sort((a,b)=>(V_NORM[a[0]]||0)-(V_NORM[b[0]]||0));
+  if (!entries.length) return <p className="text-center text-slate-400 text-sm py-6">No sends yet.</p>;
+  const max = Math.max(...entries.map(e=>e[1]));
+  return (
+    <div className="space-y-2">
+      {entries.map(([grade,count])=>(
+        <div key={grade} className="flex items-center gap-2">
+          <span className="w-8 text-xs font-bold text-slate-600 text-right shrink-0">{grade}</span>
+          <div className="flex-1 h-6 bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-full bg-brand-500 rounded-full transition-all duration-500" style={{width:`${(count/max)*100}%`}}/>
+          </div>
+          <span className="w-5 text-xs text-slate-400 shrink-0">{count}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Sparkline ─────────────────────────────────────────────────────────────────
+function Sparkline({ sessions }) {
+  const sorted = [...sessions].sort((a,b)=>a.date.localeCompare(b.date)).slice(-8);
+  if (sorted.length < 2) return <p className="text-center text-slate-400 text-sm py-4">Log more sessions to see a trend.</p>;
+  const vals = sorted.map(s=>s.climbs.length);
+  const max = Math.max(...vals,1);
+  const W=300, H=64, pad=8;
+  const pts = vals.map((v,i)=>{
+    const x = pad + (i/(vals.length-1))*(W-pad*2);
+    const y = H - pad - (v/max)*(H-pad*2);
+    return `${x},${y}`;
+  }).join(" ");
+  return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
+        <polyline fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinejoin="round" points={pts}/>
+        {vals.map((v,i)=>{
+          const x=pad+(i/(vals.length-1))*(W-pad*2);
+          const y=H-pad-(v/max)*(H-pad*2);
+          return <circle key={i} cx={x} cy={y} r="4" fill="#16a34a"/>;
+        })}
+      </svg>
+      <div className="flex justify-between text-xs text-slate-400 mt-1">
+        <span>{fmtDate(sorted[0].date)}</span>
+        <span>{fmtDate(sorted[sorted.length-1].date)}</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Session Detail ────────────────────────────────────────────────────────────
+function SessionDetail({ session, onBack, onDelete }) {
+  const sends = session.climbs.filter(c=>isSend(c.outcome));
+  return (
+    <Screen title={session.location} sub={fmtDate(session.date)} onBack={onBack}
+      action={<button onClick={()=>{if(confirm("Delete this session?"))onDelete(session.id)}} className="text-red-400 text-sm px-2">Delete</button>}
+    >
+      <div className="flex flex-wrap gap-2 mb-4">
+        <Tag>{session.discipline}</Tag>
+        <Tag>{session.type==="GYM"?"🏟 Gym":"🪨 Outdoor"}</Tag>
+        {session.duration && <Tag>⏱ {session.duration}m</Tag>}
+        {session.energy && <Tag>{ENERGY[session.energy]} Energy {session.energy}/5</Tag>}
+      </div>
+      {session.notes && (
+        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-3 text-sm text-amber-800 mb-4">{session.notes}</div>
+      )}
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        <Stat label="Climbs" value={session.climbs.length}/>
+        <Stat label="Sends" value={sends.length} color="text-green-600"/>
+        <Stat label="Attempts" value={session.climbs.filter(c=>c.outcome==="ATTEMPT").length} color="text-slate-400"/>
+      </div>
+      <h3 className="font-semibold text-sm text-slate-700 mb-2">Climbs</h3>
+      {session.climbs.length===0 && <p className="text-center text-slate-400 text-sm py-6">No climbs logged.</p>}
+      <div className="space-y-2">
+        {[...session.climbs].sort((a,b)=>b.gradeNorm-a.gradeNorm).map(c=>(
+          <div key={c.id} className="bg-white border border-slate-200 rounded-xl px-4 py-3 flex items-center justify-between">
+            <div className="min-w-0">
+              <span className="font-bold text-slate-900 mr-2">{c.grade}</span>
+              {c.name && <span className="text-sm text-slate-500">{c.name}</span>}
+              {c.notes && <p className="text-xs text-slate-400 mt-0.5 truncate">{c.notes}</p>}
+            </div>
+            <div className="flex items-center gap-2 shrink-0 ml-2">
+              {c.attempts>1 && <span className="text-xs text-slate-400">{c.attempts}×</span>}
+              {c.isProject && <Pill cls="bg-amber-100 text-amber-700">proj</Pill>}
+              <Pill cls={OUTCOME_COLOR[c.outcome]}>{c.outcome.toLowerCase()}</Pill>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Screen>
+  );
+}
+
+// ── Log Session Form ──────────────────────────────────────────────────────────
+function LogForm({ onSave, onCancel }) {
+  const [step, setStep] = useState("info");
+  const [gs, setGs] = useState("V_SCALE");
+  const [form, setForm] = useState({
+    date: new Date().toISOString().split("T")[0],
+    location: "", type: "GYM", discipline: "Bouldering",
+    duration: "", energy: "", notes: "",
+  });
+  const [climbs, setClimbs] = useState([]);
+
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+
+  function addClimb() {
+    const grades = gradeOpts(gs);
+    const grade = grades[Math.min(3, grades.length-1)];
+    setClimbs(c=>[...c,{id:uid(),grade,gradeNorm:normGrade(grade,gs),outcome:"SEND",attempts:1,isProject:false,notes:""}]);
+  }
+  function upd(id,patch) { setClimbs(c=>c.map(x=>x.id===id?{...x,...patch}:x)); }
+  function del(id) { setClimbs(c=>c.filter(x=>x.id!==id)); }
+
+  function save() {
+    onSave({ id:uid(), ...form,
+      duration: form.duration ? parseInt(form.duration) : undefined,
+      energy: form.energy ? parseInt(form.energy) : undefined,
+      notes: form.notes || undefined,
+      climbs,
+    });
+  }
+
+  const inp = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-brand-500";
+
+  if (step === "info") return (
+    <Screen title="Log Session" onBack={onCancel}>
+      <div className="space-y-3">
+        <div>
+          <label className="text-xs font-semibold text-slate-500 mb-1 block">DATE</label>
+          <input type="date" value={form.date} onChange={e=>set("date",e.target.value)} className={inp}/>
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-slate-500 mb-1 block">LOCATION *</label>
+          <input placeholder="e.g. Movement Oakland" value={form.location} onChange={e=>set("location",e.target.value)} className={inp}/>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-xs font-semibold text-slate-500 mb-1 block">TYPE</label>
+            <select value={form.type} onChange={e=>set("type",e.target.value)} className={inp}>
+              <option value="GYM">🏟 Gym</option>
+              <option value="OUTDOOR">🪨 Outdoor</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-500 mb-1 block">DISCIPLINE</label>
+            <select value={form.discipline} onChange={e=>set("discipline",e.target.value)} className={inp}>
+              <option>Bouldering</option><option>Sport</option><option>Trad</option><option>Top Rope</option>
+            </select>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-xs font-semibold text-slate-500 mb-1 block">DURATION (min)</label>
+            <input type="number" inputMode="numeric" placeholder="90" value={form.duration} onChange={e=>set("duration",e.target.value)} className={inp}/>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-500 mb-1 block">ENERGY {form.energy ? ENERGY[parseInt(form.energy)] : ""}</label>
+            <select value={form.energy} onChange={e=>set("energy",e.target.value)} className={inp}>
+              <option value="">—</option>
+              {[1,2,3,4,5].map(n=><option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-slate-500 mb-1 block">SESSION NOTES</label>
+          <textarea rows={2} placeholder="How did it go?" value={form.notes} onChange={e=>set("notes",e.target.value)} className={inp}/>
+        </div>
+      </div>
+      <div className="mt-6">
+        <button onClick={()=>{if(form.location.trim())setStep("climbs");}}
+          disabled={!form.location.trim()}
+          className="w-full bg-brand-600 disabled:opacity-40 text-white font-bold rounded-2xl py-3.5 text-base">
+          Next: Add Climbs →
+        </button>
+      </div>
+    </Screen>
+  );
+
+  return (
+    <Screen title="Add Climbs" sub={`${climbs.length} climb${climbs.length!==1?"s":""} logged`} onBack={()=>setStep("info")}
+      action={
+        <select value={gs} onChange={e=>{setGs(e.target.value);}} className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white">
+          {Object.entries(GRADE_SYSTEMS).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
+        </select>
+      }
+    >
+      <div className="space-y-3">
+        {climbs.length===0 && (
+          <div className="text-center py-10 text-slate-400 text-sm border-2 border-dashed border-slate-200 rounded-2xl">
+            Tap "Add Climb" to start logging
+          </div>
+        )}
+        {climbs.map((c,i)=>(
+          <div key={c.id} className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold text-slate-600">Climb {i+1}</span>
+              <button onClick={()=>del(c.id)} className="text-slate-300 text-xl leading-none">✕</button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">GRADE</label>
+                <select value={c.grade} onChange={e=>upd(c.id,{grade:e.target.value,gradeNorm:normGrade(e.target.value,gs)})} className={inp}>
+                  {gradeOpts(gs).map(g=><option key={g}>{g}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">OUTCOME</label>
+                <select value={c.outcome} onChange={e=>upd(c.id,{outcome:e.target.value})} className={inp}>
+                  <option value="SEND">Send</option>
+                  <option value="FLASH">Flash</option>
+                  <option value="ONSIGHT">Onsight</option>
+                  <option value="ATTEMPT">Attempt</option>
+                  <option value="PROJECT">Project</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-slate-400">ATTEMPTS</label>
+                <input type="number" inputMode="numeric" min={1} value={c.attempts}
+                  onChange={e=>upd(c.id,{attempts:Math.max(1,parseInt(e.target.value)||1)})}
+                  className="w-14 border border-slate-200 rounded-xl px-2 py-2 text-center text-base bg-white"/>
+              </div>
+              <label className="flex items-center gap-1.5 text-sm text-slate-500 cursor-pointer">
+                <input type="checkbox" checked={c.isProject} onChange={e=>upd(c.id,{isProject:e.target.checked})} className="w-4 h-4"/>
+                Project
+              </label>
+            </div>
+            <input placeholder="Notes (beta, conditions…)" value={c.notes}
+              onChange={e=>upd(c.id,{notes:e.target.value})}
+              className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-white placeholder-slate-300 focus:outline-none"/>
+          </div>
+        ))}
+        <button onClick={addClimb}
+          className="w-full border-2 border-dashed border-brand-300 text-brand-600 font-semibold rounded-2xl py-3.5 text-base active:bg-brand-50">
+          + Add Climb
+        </button>
+      </div>
+      <div className="mt-4">
+        <button onClick={save}
+          className="w-full bg-brand-600 text-white font-bold rounded-2xl py-3.5 text-base active:bg-brand-700">
+          Save Session
+        </button>
+      </div>
+    </Screen>
+  );
+}
+
+// ── Screen wrapper ────────────────────────────────────────────────────────────
+function Screen({ title, sub, onBack, action, children }) {
+  return (
+    <div className="flex flex-col min-h-full">
+      <div className="bg-white border-b border-slate-100 px-4 py-3 flex items-center gap-3 shrink-0 sticky top-0 z-10">
+        {onBack && (
+          <button onClick={onBack} className="text-brand-600 font-medium text-lg w-8 h-8 flex items-center justify-center -ml-1">‹</button>
+        )}
+        <div className="flex-1 min-w-0">
+          <h2 className="font-bold text-slate-900 leading-tight truncate">{title}</h2>
+          {sub && <p className="text-xs text-slate-400">{sub}</p>}
+        </div>
+        {action && <div className="shrink-0">{action}</div>}
+      </div>
+      <div className="flex-1 p-4">{children}</div>
+    </div>
+  );
+}
+
+// ── App ───────────────────────────────────────────────────────────────────────
+function App() {
+  const [sessions, setSessions] = useState(SEED);
+  const [tab, setTab] = useState("home");
+  const [logging, setLogging] = useState(false);
+  const [detail, setDetail] = useState(null);
+
+  const allClimbs = useMemo(()=>sessions.flatMap(s=>s.climbs),[sessions]);
+  const sends = allClimbs.filter(c=>isSend(c.outcome));
+  const projects = useMemo(()=>
+    sessions.flatMap(s=>s.climbs.filter(c=>c.isProject && !isSend(c.outcome)).map(c=>({...c,sessionDate:s.date,sessionId:s.id})))
+  ,[sessions]);
+  const hardest = [...sends].sort((a,b)=>b.gradeNorm-a.gradeNorm)[0];
+
+  const weekStart = new Date(); weekStart.setDate(weekStart.getDate()-weekStart.getDay()); weekStart.setHours(0,0,0,0);
+  const weekSess = sessions.filter(s=>new Date(s.date+"T12:00:00")>=weekStart);
+
+  function addSession(s) { setSessions(p=>[s,...p]); setLogging(false); setTab("sessions"); }
+  function delSession(id) { setSessions(p=>p.filter(s=>s.id!==id)); setDetail(null); }
+
+  const TABS = [
+    { id:"home",     icon:"🏠", label:"Home"     },
+    { id:"sessions", icon:"📋", label:"Sessions" },
+    { id:"progress", icon:"📈", label:"Progress" },
+    { id:"projects", icon:"🎯", label:"Projects" },
+  ];
+
+  // Full-screen views
+  if (logging) return (
+    <div className="h-screen overflow-y-auto bg-slate-50">
+      <LogForm onSave={addSession} onCancel={()=>setLogging(false)}/>
+    </div>
+  );
+  if (detail) return (
+    <div className="h-screen overflow-y-auto bg-slate-50">
+      <SessionDetail session={detail} onBack={()=>setDetail(null)} onDelete={id=>{delSession(id);}}/>
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col h-screen bg-slate-50">
+      {/* App header */}
+      <div className="bg-slate-900 text-white px-4 py-3 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2">
+          <span className="text-xl">⛰️</span>
+          <span className="font-black text-lg tracking-tight">Sendlog</span>
+        </div>
+        <button onClick={()=>setLogging(true)}
+          className="bg-brand-500 active:bg-brand-600 text-white text-sm font-bold px-4 py-1.5 rounded-full">
+          + Log
+        </button>
+      </div>
+
+      {/* Page content */}
+      <div className="flex-1 overflow-y-auto">
+
+        {tab==="home" && (
+          <div className="p-4 space-y-4">
+            <div>
+              <h1 className="text-xl font-black text-slate-900">Ready to send? 💪</h1>
+              <p className="text-sm text-slate-400">{sessions.length} session{sessions.length!==1?"s":""} logged</p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <Stat label="This week" value={weekSess.length}/>
+              <Stat label="Week climbs" value={weekSess.reduce((a,s)=>a+s.climbs.length,0)} color="text-brand-600"/>
+              <Stat label="Projects" value={projects.length} color="text-amber-600"/>
+            </div>
+
+            {hardest && (
+              <div className="bg-gradient-to-br from-brand-600 to-brand-800 rounded-2xl p-5 text-white">
+                <p className="text-xs font-bold uppercase tracking-widest opacity-70">Personal Best</p>
+                <p className="text-5xl font-black mt-1 mb-0.5">{hardest.grade}</p>
+                <p className="text-sm opacity-80">{hardest.notes ?? "Your hardest send 🔥"}</p>
+              </div>
+            )}
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="font-bold text-slate-900">Recent Sessions</h2>
+                <button onClick={()=>setTab("sessions")} className="text-xs text-brand-600 font-semibold">See all →</button>
+              </div>
+              <div className="space-y-2">
+                {[...sessions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,3).map(s=>{
+                  const sSends = s.climbs.filter(c=>isSend(c.outcome)).length;
+                  return (
+                    <button key={s.id} onClick={()=>setDetail(s)}
+                      className="w-full text-left bg-white border border-slate-200 rounded-2xl px-4 py-3 flex items-center justify-between active:bg-slate-50">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-slate-900 truncate">{s.location}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">{fmtDate(s.date)}</p>
+                      </div>
+                      <div className="text-right shrink-0 ml-3">
+                        <p className="text-sm font-semibold text-slate-700">{s.climbs.length} climbs</p>
+                        <p className="text-xs text-brand-600">{sSends} sends</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab==="sessions" && (
+          <div className="p-4 space-y-3">
+            <h1 className="font-black text-xl text-slate-900">Sessions</h1>
+            {sessions.length===0 && (
+              <div className="text-center py-16 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">
+                No sessions yet — tap + Log
+              </div>
+            )}
+            <div className="space-y-2">
+              {[...sessions].sort((a,b)=>b.date.localeCompare(a.date)).map(s=>{
+                const sSends=s.climbs.filter(c=>isSend(c.outcome)).length;
+                return (
+                  <button key={s.id} onClick={()=>setDetail(s)}
+                    className="w-full text-left bg-white border border-slate-200 rounded-2xl px-4 py-3.5 flex items-start justify-between active:bg-slate-50">
+                    <div className="min-w-0">
+                      <p className="font-bold text-slate-900 truncate">{s.location}</p>
+                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                        <Tag>{s.discipline}</Tag>
+                        {s.energy && <span className="text-sm">{ENERGY[s.energy]}</span>}
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1.5">{fmtDate(s.date)}</p>
+                    </div>
+                    <div className="text-right shrink-0 ml-3">
+                      <p className="text-sm font-bold text-slate-700">{s.climbs.length} climbs</p>
+                      <p className="text-xs text-brand-600">{sSends} sends</p>
+                      {s.duration && <p className="text-xs text-slate-400 mt-0.5">{s.duration}m</p>}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {tab==="progress" && (
+          <div className="p-4 space-y-4">
+            <h1 className="font-black text-xl text-slate-900">Progress</h1>
+            <div className="grid grid-cols-2 gap-2">
+              <Stat label="Total Sends" value={sends.length} color="text-brand-600"/>
+              <Stat label="Flashes" value={allClimbs.filter(c=>c.outcome==="FLASH").length} color="text-blue-600"/>
+              <Stat label="Total Sessions" value={sessions.length}/>
+              <Stat label="Hours" value={Math.round(sessions.reduce((a,s)=>a+(s.duration||0),0)/60)+"h"}/>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <h2 className="font-bold text-slate-800 mb-3">Grade Pyramid (Sends)</h2>
+              <GradePyramid sessions={sessions}/>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <h2 className="font-bold text-slate-800 mb-3">Volume Trend</h2>
+              <Sparkline sessions={sessions}/>
+            </div>
+          </div>
+        )}
+
+        {tab==="projects" && (
+          <div className="p-4 space-y-3">
+            <h1 className="font-black text-xl text-slate-900">Projects</h1>
+            {projects.length===0 && (
+              <div className="text-center py-16 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">
+                No active projects.<br/>Mark a climb as "Project" when logging.
+              </div>
+            )}
+            <div className="space-y-2">
+              {projects.map(c=>(
+                <div key={c.id} className="bg-white border border-slate-200 rounded-2xl p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <span className="text-2xl font-black text-slate-900">{c.grade}</span>
+                      {c.name && <span className="text-slate-600 ml-2">{c.name}</span>}
+                      <p className="text-xs text-slate-400 mt-1">
+                        Last tried {fmtDate(c.sessionDate)} · {c.attempts} attempt{c.attempts!==1?"s":""}
+                      </p>
+                    </div>
+                    <Pill cls="bg-amber-100 text-amber-700 shrink-0">🎯 project</Pill>
+                  </div>
+                  {c.notes && <p className="text-sm text-slate-500 mt-2 pt-2 border-t border-slate-100">{c.notes}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom nav */}
+      <div className="bg-white border-t border-slate-200 flex shrink-0 pb-safe">
+        {TABS.map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id)}
+            className={`flex-1 py-3 flex flex-col items-center gap-0.5 transition-colors ${
+              tab===t.id ? "text-brand-600" : "text-slate-400"
+            }`}>
+            <span className="text-xl leading-none">{t.icon}</span>
+            <span className={`text-xs font-semibold ${tab===t.id?"text-brand-600":"text-slate-400"}`}>{t.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
