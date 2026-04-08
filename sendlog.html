@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
+<title>sendlog</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{font-size:14px}
+body{background:#0f1012;color:#d8d8d8;font-family:'SF Mono','Fira Code','Roboto Mono',monospace;max-width:480px;margin:0 auto;min-height:100vh;padding-bottom:60px}
+.header{padding:20px 20px 10px}
+.logo{font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;color:#e8e0d0;letter-spacing:-0.5px}
+.logo sup{font-family:monospace;font-size:11px;font-weight:400;color:#666;vertical-align:middle;margin-left:4px}
+.stats-line{font-size:12px;color:#555;margin-top:3px}
+.nav{display:flex;border-bottom:1px solid #1e2022;padding:0 12px}
+.nav-btn{background:none;border:none;border-bottom:2px solid transparent;color:#555;font-family:monospace;font-size:11px;letter-spacing:.08em;padding:10px 10px 8px;cursor:pointer;margin-bottom:-1px;white-space:nowrap}
+.nav-btn.active{color:#d8d8d8;border-bottom-color:#d8d8d8}
+.panel{display:none;padding:16px 20px}
+.panel.active{display:block}
+.type-toggle{display:flex;background:#1a1c1e;border-radius:8px;padding:3px;margin-bottom:20px;width:fit-content}
+.type-toggle button{background:none;border:none;color:#555;font-family:monospace;font-size:11px;letter-spacing:.08em;padding:6px 22px;border-radius:6px;cursor:pointer}
+.type-toggle button.active{background:#2a2d30;color:#d8d8d8}
+.sec-title{font-size:11px;letter-spacing:.1em;color:#888;text-transform:uppercase;margin-bottom:16px}
+.field{margin-bottom:18px}
+.field-label{font-size:10px;letter-spacing:.1em;color:#555;text-transform:uppercase;margin-bottom:8px}
+.field-input{width:100%;background:#141618;border:1px solid #2a2d30;border-radius:6px;color:#d8d8d8;font-family:monospace;font-size:13px;padding:10px 12px;outline:none}
+.field-input::placeholder{color:#333}
+.field-input:focus{border-color:#3a3d40}
+.date-wrap{position:relative}
+.date-display{background:#141618;border:1px solid #2a2d30;border-radius:6px;color:#d8d8d8;font-family:monospace;font-size:13px;padding:10px 12px;text-align:center;cursor:pointer}
+.date-display input[type=date]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+input[type=range]{width:100%;height:2px;background:#2a2d30;border-radius:1px;outline:none;-webkit-appearance:none;margin:8px 0;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#d8d8d8;cursor:pointer}
+.slider-labels{display:flex;justify-content:space-between;font-size:9px;color:#444}
+.pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.pill{background:none;border:1px solid #2a2d30;border-radius:20px;color:#666;font-family:monospace;font-size:11px;padding:6px 13px;cursor:pointer;min-height:34px;white-space:nowrap;transition:all .1s}
+.pill:hover{border-color:#444;color:#aaa}
+.pill.active{background:#2a2d30;border-color:#4a4d50;color:#d8d8d8}
+.gym-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.detect-btn{background:none;border:1px solid #2a2d30;border-radius:4px;color:#666;font-family:monospace;font-size:10px;padding:4px 8px;cursor:pointer}
+.save-btn{width:100%;background:#1e3a2a;border:1px solid #2a5a3a;border-radius:8px;color:#4ade80;font-family:monospace;font-size:12px;letter-spacing:.1em;padding:13px;cursor:pointer;margin-top:4px}
+.save-btn:active{background:#254533}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.stat-card{background:#141618;border:1px solid #1e2022;border-radius:8px;padding:14px}
+.stat-card.full{grid-column:1/-1}
+.stat-val{font-size:28px;font-weight:700;color:#e8e8e8;line-height:1;margin-bottom:4px}
+.stat-val.big{font-size:36px}
+.stat-lbl{font-size:10px;letter-spacing:.08em;color:#555}
+.stat-head{font-size:10px;letter-spacing:.08em;color:#555;margin-bottom:4px}
+.chart-sec{margin-bottom:24px}
+.chart-title{font-size:11px;letter-spacing:.1em;color:#888;text-transform:uppercase;margin-bottom:2px}
+.chart-sub{font-size:10px;color:#444;margin-bottom:10px}
+.chart-box{background:#141618;border:1px solid #1e2022;border-radius:8px;padding:14px;overflow:hidden}
+.legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:10px;color:#555}
+.leg-line{display:inline-block;width:18px;height:2px}
+.leg-sq{display:inline-block;width:8px;height:8px;border-radius:1px}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e3a2a;border:1px solid #2a5a3a;color:#4ade80;font-family:monospace;font-size:12px;padding:8px 18px;border-radius:6px;display:none;z-index:99;white-space:nowrap}
+.gym-list-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #1e2022;font-size:13px}
+.gym-del{background:none;border:none;color:#444;cursor:pointer;font-size:16px;padding:0 4px}
+.add-gym-row{display:flex;gap:8px;margin-top:16px}
+.add-gym-row .field-input{flex:1}
+.add-gym-btn{background:#1a1c1e;border:1px solid #2a2d30;border-radius:6px;color:#888;font-family:monospace;font-size:11px;padding:10px 14px;cursor:pointer;white-space:nowrap}
+.empty{color:#444;font-size:12px;padding:20px 0}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="logo">sendlog<sup>v2</sup></div>
+  <div class="stats-line" id="stats-line">0 climbs &middot; 0 sessions</div>
+</div>
+<nav class="nav">
+  <button class="nav-btn active" onclick="switchTab('log')">LOG</button>
+  <button class="nav-btn" onclick="switchTab('outdoor')">&#127795; OUTDOOR</button>
+  <button class="nav-btn" onclick="switchTab('stats')">STATS</button>
+  <button class="nav-btn" onclick="switchTab('gym')">+ GYM</button>
+</nav>
+
+<div class="panel active" id="panel-log">
+  <div class="type-toggle">
+    <button id="tog-rope" class="active" onclick="setType('rope')">ROPE</button>
+    <button id="tog-boulder" onclick="setType('boulder')">BOULDER</button>
+  </div>
+  <div class="sec-title">LOG A CLIMB</div>
+  <div class="field"><div class="field-label">DATE</div>
+    <div class="date-wrap"><div class="date-display" id="log-date-display">&mdash;</div>
+    <input type="date" id="log-date" oninput="onDateChange()"></div></div>
+  <div id="rope-only">
+    <div class="field"><div class="field-label">ANCHOR #</div>
+      <input class="field-input" id="anchor" placeholder="e.g. 128" type="text"></div>
+    <div class="field"><div class="field-label">BOLTS (ROUTE HEIGHT)</div>
+      <input type="range" id="bolts-slider" min="4" max="14" value="10" oninput="onBoltsSlider(this.value)">
+      <div class="slider-labels"><span>4</span><span>14</span></div>
+      <input class="field-input" id="bolts-input" placeholder="or type exact #" style="margin-top:8px" oninput="onBoltsInput(this.value)" type="number" min="1" max="30"></div>
+    <div class="field"><div class="field-label">HIGH POINT (BOLT #)</div>
+      <input type="range" id="hp-slider" min="1" max="14" value="1" oninput="onHpSlider(this.value)">
+      <div class="slider-labels"><span>1</span><span>14</span></div>
+      <input class="field-input" id="hp-input" placeholder="or type exact bolt #" style="margin-top:8px" oninput="onHpInput(this.value)" type="number" min="1" max="30"></div>
+  </div>
+  <div class="field"><div class="field-label">GRADE</div>
+    <div class="pills" id="grade-pills"></div></div>
+  <div class="field" id="style-field"><div class="field-label">STYLE</div>
+    <div class="pills" id="style-pills"></div></div>
+  <div class="field" id="outcome-field" style="display:none"><div class="field-label">OUTCOME</div>
+    <div class="pills">
+      <button class="pill active" onclick="selPill(this,'outcome')">send</button>
+      <button class="pill" onclick="selPill(this,'outcome')">attempt</button>
+    </div></div>
+  <div class="field"><div class="field-label">ENERGY LEVEL</div>
+    <div class="pills">
+      <button class="pill" onclick="selPill(this,'energy')">low</button>
+      <button class="pill active" onclick="selPill(this,'energy')">med</button>
+      <button class="pill" onclick="selPill(this,'energy')">high</button>
+    </div></div>
+  <div class="field">
+    <div class="gym-row"><div class="field-label" style="margin:0">GYM</div>
+      <button class="detect-btn" onclick="toast('&#128205; Location detection not available')">&#128205; detect</button></div>
+    <div class="pills" id="gym-pills"></div></div>
+  <button class="save-btn" onclick="saveClimb()">SAVE CLIMB</button>
+</div>
+
+<div class="panel" id="panel-outdoor">
+  <div class="type-toggle">
+    <button id="out-tog-rope" class="active" onclick="setOutType('rope')">ROPE</button>
+    <button id="out-tog-boulder" onclick="setOutType('boulder')">BOULDER</button>
+  </div>
+  <div class="sec-title">LOG AN OUTDOOR CLIMB</div>
+  <div class="field"><div class="field-label">DATE</div>
+    <div class="date-wrap"><div class="date-display" id="out-date-display">&mdash;</div>
+    <input type="date" id="out-date" oninput="onOutDateChange()"></div></div>
+  <div class="field"><div class="field-label">LOCATION</div>
+    <input class="field-input" id="out-location" placeholder="e.g. Red Rock Canyon" type="text"></div>
+  <div class="field"><div class="field-label">ROUTE NAME</div>
+    <input class="field-input" id="out-route" placeholder="e.g. Johnny Vegas" type="text"></div>
+  <div class="field"><div class="field-label">GRADE</div>
+    <div class="pills" id="out-grade-pills"></div></div>
+  <div class="field"><div class="field-label">OUTCOME</div>
+    <div class="pills">
+      <button class="pill active" onclick="selPill(this,'out-outcome')">send</button>
+      <button class="pill" onclick="selPill(this,'out-outcome')">attempt</button>
+      <button class="pill" onclick="selPill(this,'out-outcome')">project</button>
+    </div></div>
+  <div class="field"><div class="field-label">ENERGY LEVEL</div>
+    <div class="pills">
+      <button class="pill" onclick="selPill(this,'out-energy')">low</button>
+      <button class="pill active" onclick="selPill(this,'out-energy')">med</button>
+      <button class="pill" onclick="selPill(this,'out-energy')">high</button>
+    </div></div>
+  <button class="save-btn" onclick="saveOutdoor()">SAVE CLIMB</button>
+</div>
+
+<div class="panel" id="panel-stats">
+  <div id="stat-cards" class="stat-grid"></div>
+  <div id="charts"></div>
+</div>
+
+<div class="panel" id="panel-gym">
+  <div class="sec-title">GYMS</div>
+  <div id="gym-list"></div>
+  <div class="add-gym-row">
+    <input class="field-input" id="new-gym" placeholder="Gym name" type="text">
+    <button class="add-gym-btn" onclick="addGym()">ADD</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const ROPE_GRADES = ['5.6','5.7','5.8','5.9','5.10-','5.10','5.10+','5.11-','5.11','5.11+','5.12-','5.12','5.12+','5.13-','5.13','5.13+','5.14-','5.14'];
+const BOUL_GRADES = ['VB','V0','V1','V2','V3','V4','V5','V6','V7','V8','V9','V10','V11','V12'];
+const ROPE_VAL = Object.fromEntries(ROPE_GRADES.map((g,i)=>[g,i]));
+const BOUL_VAL = Object.fromEntries(BOUL_GRADES.map((g,i)=>[g,i]));
+const DEFAULT_GYMS = ['CRG watertown','CRG stoneham','CRG alewife','CRG randolph','CRG south boston','CRG quincy','BBP somerville','other'];
+
+const DEMO = [
+  {date:"2025-11-25",type:"rope",anchor:"120",bolts:7,highPoint:3,grade:"5.12-",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-11-25",type:"rope",anchor:"131",bolts:11,highPoint:11,grade:"5.10-",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-11-25",type:"rope",anchor:"128",bolts:10,highPoint:7,grade:"5.10+",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-11-25",type:"rope",anchor:"127",bolts:10,highPoint:2,grade:"5.11",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-11-25",type:"rope",anchor:"133",bolts:9,highPoint:2,grade:"5.12-",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-11-26",type:"rope",anchor:"136",bolts:9,highPoint:9,grade:"5.10+",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-11-26",type:"rope",anchor:"128",bolts:10,highPoint:3,grade:"5.11+",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-11-26",type:"rope",anchor:"119",bolts:8,highPoint:8,grade:"5.10",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-11-26",type:"rope",anchor:"126",bolts:9,highPoint:6,grade:"5.10+",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-11-28",type:"rope",anchor:"128",bolts:10,highPoint:7,grade:"5.10+",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-11-28",type:"rope",anchor:"127",bolts:10,highPoint:9,grade:"5.10+",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-11-28",type:"rope",anchor:"126",bolts:10,highPoint:3,grade:"5.11+",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-11-28",type:"rope",anchor:"128",bolts:10,highPoint:4,grade:"5.12",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-11-28",type:"rope",anchor:"130",bolts:10,highPoint:4,grade:"5.12",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-11-28",type:"rope",anchor:"134",bolts:10,highPoint:10,grade:"5.10+",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-12-09",type:"rope",anchor:"130",bolts:10,highPoint:4,grade:"5.12-",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-12-09",type:"rope",anchor:"135",bolts:10,highPoint:10,grade:"5.11",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-12-09",type:"rope",anchor:"131",bolts:10,highPoint:5,grade:"5.12",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-12-09",type:"rope",anchor:"121",bolts:8,highPoint:8,grade:"5.11-",style:"toprope",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-12-10",type:"rope",anchor:"128",bolts:10,highPoint:4,grade:"5.12",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-12-11",type:"rope",anchor:"126",bolts:9,highPoint:6,grade:"5.11",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-12-11",type:"rope",anchor:"128",bolts:10,highPoint:4,grade:"5.12",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-12-11",type:"rope",anchor:"131",bolts:10,highPoint:10,grade:"5.10-",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-12-14",type:"rope",anchor:"131",bolts:10,highPoint:10,grade:"5.10-",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-12-14",type:"rope",anchor:"132",bolts:10,highPoint:5,grade:"5.11",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-12-14",type:"rope",anchor:"131",bolts:10,highPoint:6,grade:"5.12",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-12-14",type:"rope",anchor:"128",bolts:10,highPoint:4,grade:"5.12",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-12-16",type:"rope",anchor:"139",bolts:8,highPoint:8,grade:"5.9",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-12-16",type:"rope",anchor:"73",bolts:6,highPoint:6,grade:"5.11+",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2025-12-18",type:"rope",anchor:"138",bolts:9,highPoint:5,grade:"5.12-",style:"lead",energyLevel:"low",gym:"CRG watertown"},
+  {date:"2026-01-06",type:"rope",anchor:"136",bolts:10,highPoint:10,grade:"5.10-",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2026-01-06",type:"rope",anchor:"127",bolts:10,highPoint:10,grade:"5.11-",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+  {date:"2026-01-06",type:"rope",anchor:"136",bolts:8,highPoint:2,grade:"5.13-",style:"lead",energyLevel:"med",gym:"CRG watertown"},
+];
+
+function loadData(){
+  const raw=localStorage.getItem('sendlog-v2');
+  if(raw) return JSON.parse(raw);
+  const d={climbs:DEMO.map((c,i)=>({id:i+1,...c,isOutdoor:false})),gyms:[...DEFAULT_GYMS]};
+  localStorage.setItem('sendlog-v2',JSON.stringify(d));
+  return d;
+}
+function persist(){localStorage.setItem('sendlog-v2',JSON.stringify(APP));}
+
+let APP=loadData();
+
+// State
+let curType='rope',outType='rope',curGrade=null,outGrade=null,curGym=null;
+let bolts=10,hp=1;
+
+function fmtDate(s){
+  if(!s)return'';
+  const[y,m,d]=s.split('-');
+  const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return mo[+m-1]+' '+parseInt(d)+', '+y;
+}
+function today(){return new Date().toISOString().slice(0,10);}
+
+function getPill(parent,group){
+  const el=document.querySelector('#'+parent+' .pill.active');
+  return el?el.textContent.trim():null;
+}
+
+function selPill(btn,group){
+  btn.closest('.pills').querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function switchTab(t){
+  document.querySelectorAll('.nav-btn').forEach((b,i)=>{
+    b.classList.toggle('active',['log','outdoor','stats','gym'][i]===t);
+  });
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+t).classList.add('active');
+  if(t==='stats')renderStats();
+  if(t==='gym')renderGymList();
+}
+
+function setType(t){
+  curType=t;curGrade=null;
+  document.getElementById('tog-rope').classList.toggle('active',t==='rope');
+  document.getElementById('tog-boulder').classList.toggle('active',t==='boulder');
+  document.getElementById('rope-only').style.display=t==='rope'?'block':'none';
+  document.getElementById('style-field').style.display=t==='rope'?'block':'none';
+  document.getElementById('outcome-field').style.display=t==='boulder'?'block':'none';
+  renderGradePills();
+}
+function setOutType(t){
+  outType=t;outGrade=null;
+  document.getElementById('out-tog-rope').classList.toggle('active',t==='rope');
+  document.getElementById('out-tog-boulder').classList.toggle('active',t==='boulder');
+  renderOutGradePills();
+}
+
+function renderGradePills(){
+  const grades=curType==='rope'?ROPE_GRADES:BOUL_GRADES;
+  document.getElementById('grade-pills').innerHTML=grades.map(g=>
+    `<button class="pill${g===curGrade?' active':''}" onclick="selGrade('${g}',false)">${g}</button>`
+  ).join('');
+}
+function renderOutGradePills(){
+  const grades=outType==='rope'?ROPE_GRADES:BOUL_GRADES;
+  document.getElementById('out-grade-pills').innerHTML=grades.map(g=>
+    `<button class="pill${g===outGrade?' active':''}" onclick="selGrade('${g}',true)">${g}</button>`
+  ).join('');
+}
+function selGrade(g,isOut){
+  if(isOut){outGrade=g;renderOutGradePills();}
+  else{curGrade=g;renderGradePills();}
+}
+
+function renderGymPills(){
+  document.getElementById('gym-pills').innerHTML=APP.gyms.map(g=>
+    `<button class="pill${g===curGym?' active':''}" onclick="selGym('${g.replace(/'/g,"\'")}')">${g}</button>`
+  ).join('');
+}
+function selGym(g){curGym=curGym===g?null:g;renderGymPills();}
+
+function renderGymList(){
+  document.getElementById('gym-list').innerHTML=APP.gyms.map((g,i)=>
+    `<div class="gym-list-item"><span>${g}</span><button class="gym-del" onclick="delGym(${i})">&#215;</button></div>`
+  ).join('');
+}
+function addGym(){
+  const v=document.getElementById('new-gym').value.trim();
+  if(!v||APP.gyms.includes(v))return;
+  APP.gyms.push(v);persist();renderGymList();renderGymPills();
+  document.getElementById('new-gym').value='';toast('Gym added');
+}
+function delGym(i){APP.gyms.splice(i,1);persist();renderGymList();renderGymPills();}
+
+function onBoltsSlider(v){
+  bolts=+v;
+  document.getElementById('bolts-input').placeholder='or type exact # ('+v+')';
+  document.getElementById('bolts-input').value='';
+  if(hp>bolts){hp=bolts;document.getElementById('hp-slider').value=hp;document.getElementById('hp-input').placeholder='or type exact bolt # ('+hp+')';}
+}
+function onBoltsInput(v){const n=+v;if(n>=1&&n<=30){bolts=n;document.getElementById('bolts-slider').value=Math.min(n,14);}}
+function onHpSlider(v){hp=+v;document.getElementById('hp-input').placeholder='or type exact bolt # ('+v+')';document.getElementById('hp-input').value='';}
+function onHpInput(v){const n=+v;if(n>=1&&n<=30){hp=n;document.getElementById('hp-slider').value=Math.min(n,14);}}
+function onDateChange(){document.getElementById('log-date-display').textContent=fmtDate(document.getElementById('log-date').value);}
+function onOutDateChange(){document.getElementById('out-date-display').textContent=fmtDate(document.getElementById('out-date').value);}
+
+function saveClimb(){
+  if(!curGrade){toast('Select a grade');return;}
+  const dateVal=document.getElementById('log-date').value||today();
+  const boltsVal=+document.getElementById('bolts-input').value||bolts;
+  const hpVal=+document.getElementById('hp-input').value||hp;
+  const c={
+    id:Date.now(),date:dateVal,type:curType,grade:curGrade,
+    energyLevel:getPill('panel-log','energy')||'med',
+    gym:curGym||APP.gyms[0]||'',isOutdoor:false,
+  };
+  if(curType==='rope'){
+    c.anchor=document.getElementById('anchor').value;
+    c.bolts=boltsVal;c.highPoint=hpVal;
+    c.style=getPill('panel-log','style')||'lead';
+  } else {
+    c.style='boulder';
+    c.outcome=getPill('panel-log','outcome')||'send';
+  }
+  APP.climbs.push(c);persist();updateStatsLine();
+  curGrade=null;renderGradePills();
+  document.getElementById('anchor').value='';
+  toast('\u2713 Climb saved!');
+}
+
+function saveOutdoor(){
+  if(!outGrade){toast('Select a grade');return;}
+  const dateVal=document.getElementById('out-date').value||today();
+  const c={
+    id:Date.now(),date:dateVal,type:outType,grade:outGrade,
+    location:document.getElementById('out-location').value,
+    routeName:document.getElementById('out-route').value,
+    outcome:getPill('panel-outdoor','out-outcome')||'send',
+    energyLevel:getPill('panel-outdoor','out-energy')||'med',
+    isOutdoor:true,
+  };
+  APP.climbs.push(c);persist();updateStatsLine();
+  outGrade=null;renderOutGradePills();
+  document.getElementById('out-location').value='';
+  document.getElementById('out-route').value='';
+  toast('\u2713 Outdoor climb saved!');
+}
+
+function updateStatsLine(){
+  const n=APP.climbs.length;
+  const s=new Set(APP.climbs.map(c=>c.date)).size;
+  document.getElementById('stats-line').textContent=`${n} climb${n!==1?'s':''} \u00b7 ${s} session${s!==1?'s':''}`;
+}
+
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.style.display='block';
+  clearTimeout(el._t);el._t=setTimeout(()=>el.style.display='none',2200);
+}
+</script>
+
+<script>
+// ---- STATS ----
+function renderStats(){
+  const cl=APP.climbs;
+  if(!cl.length){
+    document.getElementById('stat-cards').innerHTML='<div class="empty">No climbs yet — log your first climb!</div>';
+    document.getElementById('charts').innerHTML='';return;
+  }
+  const rope=cl.filter(c=>c.type==='rope'&&!c.isOutdoor);
+  const sends=rope.filter(c=>c.bolts&&c.highPoint>=c.bolts);
+  const topOuts=sends.length;
+  const allGradeIdxs=rope.map(c=>ROPE_VAL[c.grade]??-1).filter(x=>x>=0);
+  const hardest=allGradeIdxs.length?ROPE_GRADES[Math.max(...allGradeIdxs)]:'--';
+  const comps=rope.filter(c=>c.bolts>0).map(c=>(c.highPoint||0)/c.bolts*100);
+  const avgComp=comps.length?Math.round(comps.reduce((a,b)=>a+b,0)/comps.length):0;
+
+  document.getElementById('stat-cards').innerHTML=`
+    <div class="stat-card"><div class="stat-val">${hardest}</div><div class="stat-lbl">grade attempted</div></div>
+    <div class="stat-card"><div class="stat-val">${topOuts}</div><div class="stat-lbl">top-outs</div></div>
+    <div class="stat-card full"><div class="stat-head">AVG COMPLETION</div><div class="stat-val big">${avgComp}%</div><div class="stat-lbl">bolt progress</div></div>
+  `;
+
+  const dates=[...new Set(cl.map(c=>c.date))].sort();
+  const out=document.getElementById('charts');
+  out.innerHTML='';
+  if(dates.length>=2){
+    out.appendChild(mkGradeProgChart(cl,dates));
+    out.appendChild(mkCompletionChart(cl,dates));
+    out.appendChild(mkVolumeChart(cl,dates));
+  }
+  out.appendChild(mkPyramid(cl));
+}
+
+const CW=300,CH=150,PL=34,PR=42,PT=8,PB=28;
+
+function mkSVG(w,h){return `<svg viewBox="0 0 ${w} ${h}" width="100%" style="display:block;overflow:visible">`;}
+
+function fmtDateShort(s){
+  const[y,m,d]=s.split('-');
+  return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m-1]+' '+parseInt(d);
+}
+
+function xPos(i,n){return PL+(i/(n-1))*(CW-PL-PR);}
+function yPosRange(v,mn,mx){return PT+(CH-PT-PB)*(1-(v-mn)/(mx-mn||1));}
+
+function chartWrap(title,sub,svgHtml,legendHtml){
+  const sec=document.createElement('div');
+  sec.className='chart-sec';
+  sec.innerHTML=`<div class="chart-title">${title}</div><div class="chart-sub">${sub}</div>
+    <div class="chart-box">${svgHtml}${legendHtml||''}</div>`;
+  return sec;
+}
+
+function xLabels(dates){
+  const n=dates.length;
+  const step=Math.max(1,Math.ceil(n/5));
+  let s='';
+  dates.forEach((d,i)=>{
+    if(i===0||i===n-1||i%step===0)
+      s+=`<text x="${xPos(i,n)}" y="${CH-PB+14}" text-anchor="middle" fill="#444" font-size="8" font-family="monospace">${fmtDateShort(d)}</text>`;
+  });
+  return s;
+}
+
+function hGrid(ticks,mn,mx){
+  let s='';
+  ticks.forEach(v=>{
+    const y=yPosRange(v,mn,mx);
+    s+=`<line x1="${PL}" y1="${y}" x2="${CW-PR}" y2="${y}" stroke="#1e2022" stroke-width="1"/>`;
+  });
+  return s;
+}
+
+// Grade Progression
+function mkGradeProgChart(cl,dates){
+  const rope=cl.filter(c=>c.type==='rope'&&!c.isOutdoor);
+  const sessData=dates.map(d=>{
+    const sc=rope.filter(c=>c.date===d);
+    const ss=sc.filter(c=>c.bolts&&c.highPoint>=c.bolts);
+    const maxSend=ss.length?Math.max(...ss.map(c=>ROPE_VAL[c.grade]??0)):null;
+    const maxAttempt=sc.length?Math.max(...sc.map(c=>ROPE_VAL[c.grade]??0)):null;
+    return{maxSend,maxAttempt};
+  });
+  const vals=[...sessData.map(d=>d.maxSend).filter(x=>x!=null),...sessData.map(d=>d.maxAttempt).filter(x=>x!=null)];
+  if(!vals.length)return chartWrap('GRADE PROGRESSION','hardest send per session','<div class="empty" style="padding:10px">Not enough data</div>','');
+  const mn=Math.max(0,Math.min(...vals)-1);
+  const mx=Math.min(ROPE_GRADES.length-1,Math.max(...vals)+1);
+  const n=dates.length;
+
+  // y labels
+  let yLbls='';
+  for(let i=mn;i<=mx;i+=Math.max(1,Math.floor((mx-mn)/5))){
+    const y=yPosRange(i,mn,mx);
+    const lbl=ROPE_GRADES[i]?'.'+ROPE_GRADES[i].split('.')[1]:'';
+    yLbls+=`<text x="${PL-3}" y="${y+4}" text-anchor="end" fill="#444" font-size="8" font-family="monospace">${lbl}</text>`;
+  }
+
+  function line(series,color,dashed){
+    const pts=series.map((v,i)=>v!=null?{x:xPos(i,n),y:yPosRange(v,mn,mx)}:null).filter(Boolean);
+    if(pts.length<1)return'';
+    const d=pts.map((p,i)=>(i===0?'M':'L')+p.x+' '+p.y).join(' ');
+    const dots=pts.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="3" fill="${color}"/>`).join('');
+    const path=pts.length>1?`<path d="${d}" stroke="${color}" stroke-width="1.5" fill="none" ${dashed?'stroke-dasharray="5,3"':''}/>`:'';
+    return path+dots;
+  }
+
+  const sendLine=line(sessData.map(d=>d.maxSend),'#4ade80',false);
+  const attLine=line(sessData.map(d=>d.maxAttempt),'#2a7a45',true);
+  const grid=hGrid([mn,Math.round((mn+mx)/2),mx],mn,mx);
+  const svgHtml=mkSVG(CW,CH)+grid+yLbls+xLabels(dates)+attLine+sendLine+'</svg>';
+  const leg=`<div class="legend">
+    <div class="leg-item"><span class="leg-line" style="background:#4ade80"></span>rope send</div>
+    <div class="leg-item"><span class="leg-line" style="background:none;border-top:2px dashed #2a7a45"></span>rope attempt</div>
+  </div>`;
+  return chartWrap('GRADE PROGRESSION','hardest send per session',svgHtml,leg);
+}
+
+// Completion Trend
+function mkCompletionChart(cl,dates){
+  const rope=cl.filter(c=>c.type==='rope'&&!c.isOutdoor&&c.bolts>0);
+  const data=dates.map(d=>{
+    const sc=rope.filter(c=>c.date===d);
+    if(!sc.length)return null;
+    return Math.round(sc.reduce((s,c)=>(c.highPoint||0)/c.bolts*100+s,0)/sc.length);
+  });
+  const validDates=dates.filter((_,i)=>data[i]!=null);
+  const validData=data.filter(v=>v!=null);
+  if(!validData.length)return chartWrap('COMPLETION TREND','avg % of route finished per session','<div class="empty" style="padding:10px">Not enough data</div>','');
+  const n=validDates.length;
+  const ticks=[0,25,50,75,100];
+  let yLbls='',grid='';
+  ticks.forEach(v=>{
+    const y=yPosRange(v,0,100);
+    yLbls+=`<text x="${PL-3}" y="${y+4}" text-anchor="end" fill="#444" font-size="8" font-family="monospace">${v}%</text>`;
+    grid+=`<line x1="${PL}" y1="${y}" x2="${CW-PR}" y2="${y}" stroke="#1e2022" stroke-width="1"/>`;
+  });
+  const pts=validData.map((v,i)=>({x:xPos(i,n),y:yPosRange(v,0,100)}));
+  const pathD=pts.map((p,i)=>(i===0?'M':'L')+p.x+' '+p.y).join(' ');
+  const dots=pts.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="3" fill="#e8c84a"/>`).join('');
+  const path=pts.length>1?`<path d="${pathD}" stroke="#e8c84a" stroke-width="1.5" fill="none"/>`:'';
+  const svgHtml=mkSVG(CW,CH)+grid+yLbls+xLabels(validDates)+path+dots+'</svg>';
+  return chartWrap('COMPLETION TREND','avg % of route finished per session',svgHtml,'');
+}
+
+// Volume
+function mkVolumeChart(cl,dates){
+  const counts=dates.map(d=>cl.filter(c=>c.date===d).length);
+  const mx=Math.max(...counts,1);
+  const n=dates.length;
+  const bw=Math.max(4,(CW-PL-PR)/n*0.55);
+  let bars='',yLbls='',grid='';
+  [0,Math.ceil(mx/2),mx].forEach(v=>{
+    const y=yPosRange(v,0,mx);
+    yLbls+=`<text x="${PL-3}" y="${y+4}" text-anchor="end" fill="#444" font-size="8" font-family="monospace">${v}</text>`;
+    if(v>0)grid+=`<line x1="${PL}" y1="${y}" x2="${CW-PR}" y2="${y}" stroke="#1e2022" stroke-width="1"/>`;
+  });
+  counts.forEach((c,i)=>{
+    const x=xPos(i,n)-bw/2;
+    const h=(c/mx)*(CH-PT-PB);
+    const y=PT+(CH-PT-PB)-h;
+    bars+=`<rect x="${x}" y="${y}" width="${bw}" height="${h}" fill="#3a5a7a" rx="1"/>`;
+  });
+  const base=`<line x1="${PL}" y1="${CH-PB}" x2="${CW-PR}" y2="${CH-PB}" stroke="#2a2d30" stroke-width="1"/>`;
+  const svgHtml=mkSVG(CW,CH)+grid+yLbls+xLabels(dates)+base+bars+'</svg>';
+  return chartWrap('VOLUME','climbs per session',svgHtml,'');
+}
+
+// Grade Pyramid
+function mkPyramid(cl){
+  const rope=cl.filter(c=>c.type==='rope'&&!c.isOutdoor&&ROPE_VAL[c.grade]!=null);
+  if(!rope.length)return document.createElement('div');
+  const gradeMap={};
+  rope.forEach(c=>{
+    if(!gradeMap[c.grade])gradeMap[c.grade]={a:0,s:0};
+    gradeMap[c.grade].a++;
+    if(c.bolts&&c.highPoint>=c.bolts)gradeMap[c.grade].s++;
+  });
+  const grades=Object.keys(gradeMap).sort((a,b)=>(ROPE_VAL[a]??0)-(ROPE_VAL[b]??0));
+  const maxA=Math.max(...grades.map(g=>gradeMap[g].a));
+  const LW=36,RW=32,RH=20,GAP=4,PAD=8;
+  const barW=CW-LW-RW-PAD*2;
+  const totalH=grades.length*(RH+GAP)+28;
+  let rows='';
+  grades.forEach((g,i)=>{
+    const{a,s}=gradeMap[g];
+    const y=i*(RH+GAP)+PT;
+    const aw=(a/maxA)*barW;
+    const sw=(s/maxA)*barW;
+    rows+=`<text x="${LW-4}" y="${y+RH/2+4}" text-anchor="end" fill="${s>0?'#d8d8d8':'#555'}" font-size="9" font-family="monospace">${g}</text>`;
+    rows+=`<rect x="${LW}" y="${y}" width="${aw}" height="${RH}" fill="#1e2010" rx="2"/>`;
+    if(sw>0)rows+=`<rect x="${LW}" y="${y}" width="${sw}" height="${RH}" fill="#8a7a00" rx="2"/>`;
+    rows+=`<text x="${LW+barW+6}" y="${y+RH/2+4}" fill="${s>0?'#888':'#444'}" font-size="9" font-family="monospace">${s}/${a}</text>`;
+  });
+  const legY=totalH-8;
+  const legend=`<rect x="${LW}" y="${legY-7}" width="9" height="9" fill="#1e2010" rx="1"/>
+    <text x="${LW+12}" y="${legY}" fill="#444" font-size="8" font-family="monospace">attempts</text>
+    <rect x="${LW+65}" y="${legY-7}" width="9" height="9" fill="#8a7a00" rx="1"/>
+    <text x="${LW+78}" y="${legY}" fill="#444" font-size="8" font-family="monospace">sends</text>`;
+  const svgHtml=`<svg viewBox="0 0 ${CW} ${totalH}" width="100%" style="display:block">${rows}${legend}</svg>`;
+  return chartWrap('GRADE PYRAMID','attempts vs sends by grade',svgHtml,'');
+}
+
+// ---- INIT ----
+window.addEventListener('DOMContentLoaded',()=>{
+  const t=today();
+  document.getElementById('log-date').value=t;
+  document.getElementById('log-date-display').textContent=fmtDate(t);
+  document.getElementById('out-date').value=t;
+  document.getElementById('out-date-display').textContent=fmtDate(t);
+  // Style pills
+  document.getElementById('style-pills').innerHTML=
+    ['lead','toprope','boulder'].map((s,i)=>
+      `<button class="pill${i===0?' active':''}" onclick="selPill(this,'style')">${s}</button>`
+    ).join('');
+  renderGradePills();
+  renderOutGradePills();
+  renderGymPills();
+  updateStatsLine();
+});
+</script>
+</body>
+</html>
