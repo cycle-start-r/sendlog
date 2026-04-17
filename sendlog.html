@@ -71,7 +71,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 </div>
 <nav class="nav">
   <button class="nav-btn active" onclick="switchTab('log')">LOG</button>
-  <button class="nav-btn" onclick="switchTab('outdoor')">&#127795; OUTDOOR</button>
   <button class="nav-btn" onclick="switchTab('stats')">STATS</button>
   <button class="nav-btn" onclick="switchTab('gym')">+ GYM</button>
 </nav>
@@ -119,35 +118,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
   <button class="save-btn" onclick="saveClimb()">SAVE CLIMB</button>
 </div>
 
-<div class="panel" id="panel-outdoor">
-  <div class="type-toggle">
-    <button id="out-tog-rope" class="active" onclick="setOutType('rope')">ROPE</button>
-    <button id="out-tog-boulder" onclick="setOutType('boulder')">BOULDER</button>
-  </div>
-  <div class="sec-title">LOG AN OUTDOOR CLIMB</div>
-  <div class="field"><div class="field-label">DATE</div>
-    <div class="date-wrap"><div class="date-display" id="out-date-display">&mdash;</div>
-    <input type="date" id="out-date" oninput="onOutDateChange()"></div></div>
-  <div class="field"><div class="field-label">LOCATION</div>
-    <input class="field-input" id="out-location" placeholder="e.g. Red Rock Canyon" type="text"></div>
-  <div class="field"><div class="field-label">ROUTE NAME</div>
-    <input class="field-input" id="out-route" placeholder="e.g. Johnny Vegas" type="text"></div>
-  <div class="field"><div class="field-label">GRADE</div>
-    <div class="pills" id="out-grade-pills"></div></div>
-  <div class="field"><div class="field-label">OUTCOME</div>
-    <div class="pills">
-      <button class="pill active" onclick="selPill(this,'out-outcome')">send</button>
-      <button class="pill" onclick="selPill(this,'out-outcome')">attempt</button>
-      <button class="pill" onclick="selPill(this,'out-outcome')">project</button>
-    </div></div>
-  <div class="field"><div class="field-label">ENERGY LEVEL</div>
-    <div class="pills">
-      <button class="pill" onclick="selPill(this,'out-energy')">low</button>
-      <button class="pill active" onclick="selPill(this,'out-energy')">med</button>
-      <button class="pill" onclick="selPill(this,'out-energy')">high</button>
-    </div></div>
-  <button class="save-btn" onclick="saveOutdoor()">SAVE CLIMB</button>
-</div>
 
 <div class="panel" id="panel-stats">
   <div id="stat-cards" class="stat-grid"></div>
@@ -220,7 +190,7 @@ function persist(){localStorage.setItem('sendlog-v2',JSON.stringify(APP));}
 let APP=loadData();
 
 // State
-let curType='rope',outType='rope',curGrade=null,outGrade=null,curGym=null;
+let curType='rope',curGrade=null,curGym=null;
 let bolts=10,hp=1;
 
 function fmtDate(s){
@@ -243,7 +213,7 @@ function selPill(btn,group){
 
 function switchTab(t){
   document.querySelectorAll('.nav-btn').forEach((b,i)=>{
-    b.classList.toggle('active',['log','outdoor','stats','gym'][i]===t);
+    b.classList.toggle('active',['log','stats','gym'][i]===t);
   });
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('panel-'+t).classList.add('active');
@@ -260,29 +230,13 @@ function setType(t){
   document.getElementById('outcome-field').style.display=t==='boulder'?'block':'none';
   renderGradePills();
 }
-function setOutType(t){
-  outType=t;outGrade=null;
-  document.getElementById('out-tog-rope').classList.toggle('active',t==='rope');
-  document.getElementById('out-tog-boulder').classList.toggle('active',t==='boulder');
-  renderOutGradePills();
-}
-
 function renderGradePills(){
   const grades=curType==='rope'?ROPE_GRADES:BOUL_GRADES;
   document.getElementById('grade-pills').innerHTML=grades.map(g=>
-    `<button class="pill${g===curGrade?' active':''}" onclick="selGrade('${g}',false)">${g}</button>`
+    `<button class="pill${g===curGrade?' active':''}" onclick="selGrade('${g}')">${g}</button>`
   ).join('');
 }
-function renderOutGradePills(){
-  const grades=outType==='rope'?ROPE_GRADES:BOUL_GRADES;
-  document.getElementById('out-grade-pills').innerHTML=grades.map(g=>
-    `<button class="pill${g===outGrade?' active':''}" onclick="selGrade('${g}',true)">${g}</button>`
-  ).join('');
-}
-function selGrade(g,isOut){
-  if(isOut){outGrade=g;renderOutGradePills();}
-  else{curGrade=g;renderGradePills();}
-}
+function selGrade(g){curGrade=g;renderGradePills();}
 
 function renderGymPills(){
   document.getElementById('gym-pills').innerHTML=APP.gyms.map(g=>
@@ -314,7 +268,6 @@ function onBoltsInput(v){const n=+v;if(n>=1&&n<=30){bolts=n;document.getElementB
 function onHpSlider(v){hp=+v;document.getElementById('hp-input').placeholder='or type exact bolt # ('+v+')';document.getElementById('hp-input').value='';}
 function onHpInput(v){const n=+v;if(n>=1&&n<=30){hp=n;document.getElementById('hp-slider').value=Math.min(n,14);}}
 function onDateChange(){document.getElementById('log-date-display').textContent=fmtDate(document.getElementById('log-date').value);}
-function onOutDateChange(){document.getElementById('out-date-display').textContent=fmtDate(document.getElementById('out-date').value);}
 
 function saveClimb(){
   if(!curGrade){toast('Select a grade');return;}
@@ -340,23 +293,6 @@ function saveClimb(){
   toast('\u2713 Climb saved!');
 }
 
-function saveOutdoor(){
-  if(!outGrade){toast('Select a grade');return;}
-  const dateVal=document.getElementById('out-date').value||today();
-  const c={
-    id:Date.now(),date:dateVal,type:outType,grade:outGrade,
-    location:document.getElementById('out-location').value,
-    routeName:document.getElementById('out-route').value,
-    outcome:getPill('panel-outdoor','out-outcome')||'send',
-    energyLevel:getPill('panel-outdoor','out-energy')||'med',
-    isOutdoor:true,
-  };
-  APP.climbs.push(c);persist();updateStatsLine();
-  outGrade=null;renderOutGradePills();
-  document.getElementById('out-location').value='';
-  document.getElementById('out-route').value='';
-  toast('\u2713 Outdoor climb saved!');
-}
 
 function updateStatsLine(){
   const n=APP.climbs.length;
@@ -578,15 +514,12 @@ window.addEventListener('DOMContentLoaded',()=>{
   const t=today();
   document.getElementById('log-date').value=t;
   document.getElementById('log-date-display').textContent=fmtDate(t);
-  document.getElementById('out-date').value=t;
-  document.getElementById('out-date-display').textContent=fmtDate(t);
   // Style pills
   document.getElementById('style-pills').innerHTML=
     ['lead','toprope','boulder'].map((s,i)=>
       `<button class="pill${i===0?' active':''}" onclick="selPill(this,'style')">${s}</button>`
     ).join('');
   renderGradePills();
-  renderOutGradePills();
   renderGymPills();
   updateStatsLine();
 });
